@@ -9,6 +9,7 @@ import { Readable } from "stream";
 import { resolve } from "path";
 import { mkdirSync, createWriteStream } from "fs";
 import { mockArtifact, mockMultipleArtifacts } from "../../mocks/artifacts";
+import { apiVersion } from "../../../src/utils.js";
 
 jest.mock("fs");
 
