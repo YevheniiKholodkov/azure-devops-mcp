@@ -243,4 +243,113 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].resource.uri).toContain(expectedBase64);
     });
   });
+
+  describe("read_pipeline_artifact_file", () => {
+    it("reads a text file from an artifact", async () => {
+      const mockFileContent = "This is the content of the file";
+      const mockResponse = {
+        ok: true,
+        text: jest.fn().mockResolvedValue(mockFileContent),
+        statusText: "OK",
+      };
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
+      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
+
+      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
+      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
+      const [, , , handler] = call;
+      const params = {
+        containerId: "123456",
+        itemPath: "/logs/build.log",
+        isShallow: false,
+        asText: true,
+      };
+
+      const result = await handler(params);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `https://dev.azure.com/test-org/_apis/resources/Containers/123456?itemPath=${encodeURIComponent("/logs/build.log")}&isShallow=false&api-version=${apiVersion}`,
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-token",
+          }),
+        })
+      );
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(mockFileContent);
+    });
+
+    it("reads a binary file from an artifact", async () => {
+      const mockFileBuffer = Buffer.from("binary content");
+      const mockResponse = {
+        ok: true,
+        arrayBuffer: jest.fn().mockResolvedValue(mockFileBuffer.buffer),
+        statusText: "OK",
+      };
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
+      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
+
+      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
+      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        containerId: "123456",
+        itemPath: "/bin/app.exe",
+        isShallow: false,
+        asText: false,
+      };
+
+      const result = await handler(params);
+
+      expect(result.content[0].type).toBe("resource");
+      expect(result.content[0].resource.mimeType).toBe("application/octet-stream");
+      expect(result.content[0].resource.uri).toContain("data:application/octet-stream;base64,");
+    });
+
+    it("handles fetch errors", async () => {
+      const mockResponse = {
+        ok: false,
+        statusText: "Not Found",
+      };
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
+      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
+
+      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
+      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        containerId: "123456",
+        itemPath: "/missing.txt",
+        isShallow: false,
+        asText: true,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Failed to fetch artifact item: Not Found");
+    });
+
+    it("handles network errors", async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(new Error("Network connection failed"));
+      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
+
+      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
+      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        containerId: "123456",
+        itemPath: "/file.txt",
+        isShallow: false,
+        asText: true,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Network connection failed");
+    });
+  });
 });
