@@ -195,5 +195,52 @@ describe("configureArtifactTools", () => {
 
       await expect(handler(params)).rejects.toThrow("Network error");
     });
+
+    it("returns artifact as base64 binary when destinationPath is not provided", async () => {
+      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
+
+      // Create a mock readable stream with test content
+      const testContent = Buffer.from("fake zip content for binary test");
+      const mockFileStream = new Readable({
+        read() {
+          this.push(testContent);
+          this.push(null);
+        },
+      });
+
+      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+
+      mockConnection.getBuildApi.mockResolvedValue({
+        getArtifact: mockGetArtifact,
+        getArtifactContentZip: mockGetArtifactContentZip,
+      } as any);
+
+      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "download_pipeline_artifact");
+      if (!call) throw new Error("download_pipeline_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        // No destinationPath provided - should return binary
+      };
+
+      const result = await handler(params);
+
+      expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
+      expect(mockGetArtifactContentZip).toHaveBeenCalledWith("test-project", 12345, "drop");
+
+      // Verify the result contains base64 encoded binary content
+      expect(result.content[0].type).toBe("resource");
+      expect(result.content[0].resource.mimeType).toBe("application/zip");
+      expect(result.content[0].resource.uri).toContain("data:application/zip;base64,");
+
+      // Verify the base64 content matches the original
+      const expectedBase64 = testContent.toString("base64");
+      expect(result.content[0].resource.text).toBe(expectedBase64);
+      expect(result.content[0].resource.uri).toContain(expectedBase64);
+    });
   });
 });
