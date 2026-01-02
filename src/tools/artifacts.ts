@@ -39,7 +39,7 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the project."),
       buildId: z.number().describe("The ID of the build."),
       artifactName: z.string().describe("The name of the artifact to download."),
-      destinationPath: z.string().describe("The local path to download the artifact to."),
+      destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
       const connection = await connectionProvider();
@@ -52,22 +52,49 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
         };
       }
 
-      var fileStream = await buildApi.getArtifactContentZip(project, buildId, artifactName);
+      const fileStream = await buildApi.getArtifactContentZip(project, buildId, artifactName);
 
-      const fullDestinationPath = resolve(destinationPath);
+      // If destinationPath is provided, save to disk
+      if (destinationPath) {
+        const fullDestinationPath = resolve(destinationPath);
 
-      mkdirSync(fullDestinationPath, { recursive: true });
-      const tempFilePath = join(fullDestinationPath, `${artifactName}.zip`);
+        mkdirSync(fullDestinationPath, { recursive: true });
+        const tempFilePath = join(fullDestinationPath, `${artifactName}.zip`);
 
-      const writeStream = createWriteStream(tempFilePath);
+        const writeStream = createWriteStream(tempFilePath);
+        await new Promise<void>((resolve, reject) => {
+          fileStream.pipe(writeStream);
+          fileStream.on("end", () => resolve());
+          fileStream.on("error", (err) => reject(err));
+        });
+
+        return {
+          content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${destinationPath}.` }],
+        };
+      }
+
+      // Otherwise, return binary content as base64
+      const chunks: Buffer[] = [];
       await new Promise<void>((resolve, reject) => {
-        fileStream.pipe(writeStream);
+        fileStream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
         fileStream.on("end", () => resolve());
         fileStream.on("error", (err) => reject(err));
       });
 
+      const buffer = Buffer.concat(chunks);
+      const base64Data = buffer.toString("base64");
+
       return {
-        content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${destinationPath}.` }],
+        content: [
+          {
+            type: "resource",
+            resource: {
+              uri: `data:application/zip;base64,${base64Data}`,
+              mimeType: "application/zip",
+              text: base64Data,
+            },
+          },
+        ],
       };
     }
   );
