@@ -46,7 +46,7 @@ describe("configureArtifactTools", () => {
   });
 
   describe("list_pipeline_artifacts", () => {
-    it("lists artifacts for a given build", async () => {
+    it("should list artifacts for a given build", async () => {
       const mockGetArtifacts = jest.fn().mockResolvedValue(mockMultipleArtifacts);
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
@@ -64,7 +64,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].text).toContain("Container");
     });
 
-    it("handles empty artifact list", async () => {
+    it("should handle empty artifact list", async () => {
       const mockGetArtifacts = jest.fn().mockResolvedValue([]);
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
@@ -81,7 +81,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].text).toBe("[]");
     });
 
-    it("handles errors when listing artifacts", async () => {
+    it("should handle errors when listing artifacts", async () => {
       const mockGetArtifacts = jest.fn().mockRejectedValue(new Error("Build not found"));
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
@@ -119,7 +119,7 @@ describe("configureArtifactTools", () => {
       });
     });
 
-    it("downloads and saves an artifact", async () => {
+    it("should download and save an artifact", async () => {
       const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
       const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
 
@@ -149,7 +149,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].text).toContain("Artifact drop downloaded");
     });
 
-    it("handles artifact not found", async () => {
+    it("should handle artifact not found", async () => {
       const mockGetArtifact = jest.fn().mockResolvedValue(null);
 
       mockConnection.getBuildApi.mockResolvedValue({
@@ -173,7 +173,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].text).toContain("Artifact drop not found");
     });
 
-    it("handles download errors", async () => {
+    it("should handle download errors correctly", async () => {
       const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
       const mockGetArtifactContentZip = jest.fn().mockRejectedValue(new Error("Network error"));
 
@@ -197,7 +197,7 @@ describe("configureArtifactTools", () => {
       await expect(handler(params)).rejects.toThrow("Network error");
     });
 
-    it("returns artifact as base64 binary when destinationPath is not provided", async () => {
+    it("should return artifact as base64 binary when destinationPath is not provided", async () => {
       const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
 
       // Create a mock readable stream with test content
@@ -246,7 +246,7 @@ describe("configureArtifactTools", () => {
   });
 
   describe("read_pipeline_artifact_file", () => {
-    it("reads a text file from an artifact", async () => {
+    it("should read a text file from an artifact", async () => {
       const mockFileContent = "This is the content of the file";
       const mockResponse = {
         ok: true,
@@ -282,7 +282,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].text).toBe(mockFileContent);
     });
 
-    it("reads a binary file from an artifact", async () => {
+    it("should read a binary file from an artifact", async () => {
       const mockFileBuffer = Buffer.from("binary content");
       const mockResponse = {
         ok: true,
@@ -311,7 +311,7 @@ describe("configureArtifactTools", () => {
       expect(result.content[0].resource.uri).toContain("data:application/octet-stream;base64,");
     });
 
-    it("handles fetch errors", async () => {
+    it("should handle fetch errors correctly", async () => {
       const mockResponse = {
         ok: false,
         statusText: "Not Found",
@@ -334,7 +334,7 @@ describe("configureArtifactTools", () => {
       await expect(handler(params)).rejects.toThrow("Failed to fetch artifact item: Not Found");
     });
 
-    it("handles network errors", async () => {
+    it("should handle network errors correctly", async () => {
       (global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(new Error("Network connection failed"));
       (tokenProvider as jest.Mock).mockResolvedValue("test-token");
 
