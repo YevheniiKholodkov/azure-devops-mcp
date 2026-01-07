@@ -6,8 +6,8 @@ import { WebApi } from "azure-devops-node-api";
 import { apiVersion } from "../utils.js";
 import { z } from "zod";
 
-import { mkdirSync, createWriteStream, writeFileSync } from "fs";
-import { join, resolve, dirname } from "path";
+import { mkdirSync, createWriteStream } from "fs";
+import { join, resolve } from "path";
 
 const ARTIFACT_TOOLS = {
   list_pipeline_artifacts: "list_pipeline_artifacts",
@@ -114,6 +114,7 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
       const connection = await connectionProvider();
       const orgUrl = connection.serverUrl;
       const artifactUrl = `${orgUrl}/_apis/resources/Containers/${containerId}?itemPath=${encodeURIComponent(itemPath)}&isShallow=${isShallow}&api-version=${apiVersion}`;
+
       const token = await tokenProvider();
       const response = await fetch(artifactUrl, {
         method: "GET",
@@ -121,6 +122,7 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
           Authorization: `Bearer ${token}`,
         },
       });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch artifact item: ${response.statusText}`);
       }
